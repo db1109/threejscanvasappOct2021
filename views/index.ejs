@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Product View</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="style.css">	
+	</head>
+	<body>
+     <div></div>
+ <script type="module">
+      import * as THREE from 'https://unpkg.com/three@0.126.1/build/three.module.js';
+      import { PointerLockControls } from 'https://unpkg.com/three@0.126.1/examples/jsm/controls/PointerLockControls.js';   
+      import { GLTFLoader } from 'https://unpkg.com/three@0.126.1/examples/jsm/loaders/GLTFLoader.js';
+      import { OrbitControls } from 'https://unpkg.com/three@0.126.1/examples/jsm/controls/OrbitControls.js';
+    //  get all my data from salesforce this is the canvas part - getting data from SFDC into the ejs page
+      var JSFrecords = '<%- JSON.stringify(pv.jsforcerecords.records) %>';
+      var recordId = '<%- JSON.stringify(pv.canvasrecords.recordId) %>';
+      var imageref = '<%- JSON.stringify(pv.canvasrecords.imageref) %>';
+      imageref = imageref.replace(/['"]+/g, '');
+//three.js variable - this is taken from a three.js example
+        let camera;
+        let controls;
+        let scene;
+        let renderer;
+        init();
+        animate();
+function init() {
+// Camera - this is taken from a three.js example
+    camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 2, 2000);
+    camera.position.x = 750;
+    camera.position.y = 500;
+    camera.position.z = 1250;
+// Scene - this is taken from a three.js example
+    scene = new THREE.Scene();
+// Lights - this is taken from a three.js example
+    const lights = [];
+    lights[0] = new THREE.PointLight(0xffffff, 1, 0);
+    lights[1] = new THREE.PointLight(0xffffff, 1, 0);
+    lights[2] = new THREE.PointLight(0xffffff, 1, 0);
+    lights[0].position.set(0, 2000, 0);
+    lights[1].position.set(1000, 2000, 1000);
+    lights[2].position.set(-1000, -2000, -1000);
+    scene.add(lights[0]);
+    scene.add(lights[1]);
+    scene.add(lights[2]);
+// labels from Salesforce - this is written for canvas context
+    var myinput = JSON.parse(JSFrecords);
+    var myJSFrecords = myinput;
+    for (var i = 0; i < myJSFrecords.length; i++){
+        var mypos = myJSFrecords[i].Position__c;
+        var myparams = myJSFrecords[i].parameters__c;
+        var objpos = JSON.parse(mypos); 
+        var objparams = JSON.parse(myparams);
+       var spritey = makeTextSprite( (myJSFrecords[i].Name + ":" +  myJSFrecords[i].Id), objparams);
+        spritey.position.set(objpos.x, objpos.y, objpos.z);
+		scene.add( spritey );}
+//3D Image processing - this is taken from a three.js example
+    const objects = [];
+	var requestedgltf = '/images/' + imageref + '.gltf';
+	var ldrb = new GLTFLoader();
+	ldrb.load(requestedgltf,
+	   ( gltf ) => {
+		   scene.add(gltf.scene);
+		   gltf.scene.scale.set(20, 20, 20);
+		   gltf.scene.traverse( function( object ) {
+			object.position.set(0, -200, 500);
+			object.scale.set(60, 60, 60);
+		  scene.add(object);
+		   objects.push( object );})},null,null)
+// Renderer - this is taken from a three.js example
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0xCFE2F3, 1);
+    document.body.appendChild(renderer.domElement);
+// Controls - this is taken from a three.js example
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableZoom = true;
+    window.addEventListener("resize", onWindowResize, false);}
+//function to make the sprites / labels - this is adapted from a three.js example
+function makeTextSprite( message, parameters ){
+	if ( parameters === undefined ) parameters = {};	
+	var fontface = parameters.hasOwnProperty("fontface") ? parameters["fontface"] : "Arial";
+	var fontsize = parameters.hasOwnProperty("fontsize") ? parameters["fontsize"] : 10;
+	var borderThickness = parameters.hasOwnProperty("borderThickness") ? parameters["borderThickness"] : 4;
+	var borderColor = parameters.hasOwnProperty("borderColor") ?parameters["borderColor"] : { r:0, g:0, b:0, a:1.0 };
+	var backgroundColor = parameters.hasOwnProperty("backgroundColor") ?	parameters["backgroundColor"] : { r:255, g:255, b:255, a:1.0 };
+	var canvas = document.createElement('canvas');
+	var context = canvas.getContext('2d');
+	context.font = "Bold " + fontsize + "px " + fontface;
+	// get size data (height depends only on font size)
+	var metrics = context.measureText( message );
+	var textWidth = metrics.width;
+	context.fillStyle   = "rgba(" + backgroundColor.r + "," + backgroundColor.g + "," + backgroundColor.b + "," + backgroundColor.a + ")";
+	context.strokeStyle = "rgba(" + borderColor.r + "," + borderColor.g + "," + borderColor.b + "," + borderColor.a + ")";
+	context.lineWidth = borderThickness;
+	roundRect(context, borderThickness/2, borderThickness/2, textWidth + borderThickness, fontsize * 1.4 + borderThickness, 6);
+	context.fillStyle = "rgba(0, 0, 0, 1.0)";
+	context.fillText( message, borderThickness, fontsize + borderThickness);
+	var texture = new THREE.Texture(canvas) 
+	texture.needsUpdate = true;
+    var spriteMaterial = new THREE.SpriteMaterial( { map: texture, color: 0xffffff } );
+	var sprite = new THREE.Sprite( spriteMaterial );
+	sprite.scale.set(100,50,1.0);
+	return sprite;	}
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y);
+    ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r);
+    ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h);
+    ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r);
+    ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.closePath();
+    ctx.fill();
+	ctx.stroke(); }
+//this is copied from three.js example
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);}
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    render();}
+function render() {
+    renderer.render(scene, camera);
+    updateScreenPosition();}
+function updateScreenPosition() {
+    const vector = new THREE.Vector3(150, 0, 50);
+    const canvas = renderer.domElement;
+    vector.project(camera);
+    vector.x = Math.round((0.5 + vector.x / 2) * (canvas.width / window.devicePixelRatio));
+    vector.y = Math.round((0.5 - vector.y / 2) * (canvas.height / window.devicePixelRatio));}
+</script>
+</body>
+</html>
